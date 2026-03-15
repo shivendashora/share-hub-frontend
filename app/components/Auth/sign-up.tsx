@@ -1,7 +1,7 @@
 'use client'
 import { useState } from "react";
 import { Eye, EyeOff, ArrowRight, ArrowLeft } from "lucide-react";
-import apiFetch from "@/utils/api-fetch"
+import ApiFetch from "@/utils/api-fetch"
 
 function InputField({ label, id, type = "text", placeholder, value, onChange, rightElement }: any) {
     return (
@@ -33,7 +33,7 @@ export default function SignUp({ onBackToLogin }: any) {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const { post } = apiFetch()
+    const { post } = ApiFetch()
 
     const passwordsMatch = !confirmPassword || password === confirmPassword;
 
@@ -50,6 +50,8 @@ export default function SignUp({ onBackToLogin }: any) {
             confirmPassword: confirmPassword,
             email: email
         }
+
+        console.log("signup payload",signUpPayload);
 
         const response = await post("http://localhost:3001/auth/signup", signUpPayload)
         console.log("Response from API..", response);
@@ -121,9 +123,9 @@ export default function SignUp({ onBackToLogin }: any) {
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
                             placeholder="Repeat your password"
-                            className={`w-full h-11 px-4 pr-11 bg-gray-50 border text-gray-900 text-sm rounded-xl outline-none transition-all focus:bg-white focus:ring-2 placeholder:text-gray-400 ${!passwordsMatch
-                                ? "border-red-300 focus:border-red-400 focus:ring-red-100"
-                                : "border-gray-200 focus:border-blue-500 focus:ring-blue-100"
+                            className={`w-full h-11 px-4 pr-11 bg-gray-50 border text-gray-900 text-sm rounded-xl outline-none transition-all focus:bg-white focus:ring-2 placeholder:text-gray-400 ${passwordsMatch
+                                ? "border-gray-200 focus:border-blue-500 focus:ring-blue-100"
+                                : "border-red-300 focus:border-red-400 focus:ring-red-100"
                                 }`}
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">

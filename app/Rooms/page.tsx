@@ -1,23 +1,69 @@
 'use client'
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import UserCard from "../components/Rooms/user-card";
 import ChatInterface from "../components/Rooms/chat-interface";
 import { Search, Edit } from "lucide-react";
+import ApiFetch from "@/utils/api-fetch";
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 const usersData = [
-  { id: 1, name: "Shiven",  lastMessage: "Hey bro!",             time: "10:45 AM", unread: 2 },
-  { id: 2, name: "Rahul",   lastMessage: "Let's meet tomorrow",  time: "09:30 AM" },
-  { id: 3, name: "Ananya",  lastMessage: "Sent the files ✅",    time: "Yesterday" },
-  { id: 4, name: "Priya",   lastMessage: "Can you review this?", time: "Yesterday" },
+  { id: 1, name: "Shiven", lastMessage: "Hey bro!", time: "10:45 AM", unread: 2 },
+  { id: 2, name: "Rahul", lastMessage: "Let's meet tomorrow", time: "09:30 AM" },
+  { id: 3, name: "Ananya", lastMessage: "Sent the files ✅", time: "Yesterday" },
+  { id: 4, name: "Priya", lastMessage: "Can you review this?", time: "Yesterday" },
 ];
 
 export default function Rooms() {
   const [selectedUser, setSelectedUser] = useState(usersData[0]);
   const [search, setSearch] = useState("");
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [users, setUsers] = useState<any[]>([])
+  const searchParams = useSearchParams();
+  const queryRoomId = searchParams.get("roomId");
+  const router = useRouter();
+  const { get } = ApiFetch()
 
-  const filtered = usersData.filter((u) =>
-    u.name.toLowerCase().includes(search.toLowerCase())
+  const filtered = users.filter((u) =>
+    u.userName.toLowerCase().includes(search.toLowerCase())  // was u.name
   );
+
+  console.log(filtered);
+
+  // Rooms.tsx
+  const fetchRoomInfo = async () => {
+    try {
+
+      let finalRoomId = queryRoomId;
+
+      if (!finalRoomId) {
+        const room = await get("http://localhost:3001/rooms/createRoomForUser");
+        finalRoomId = room?.roomId;
+      }
+
+      if (finalRoomId) {
+        setRoomId(finalRoomId);
+
+        const usersResponse = await get(
+          `http://localhost:3001/rooms/getMembers/${finalRoomId}`
+        );
+
+        const mapped = usersResponse?.mappedUsers ?? [];
+        setUsers(mapped);
+
+        if (mapped.length > 0) {
+          setSelectedUser(mapped[0]);
+        }
+      }
+
+    } catch (e: any) {
+      console.error(e);
+    }
+  }
+
+  useEffect(() => {
+    fetchRoomInfo()
+  }, [])
 
   return (
     <div className="flex flex-row h-[calc(100vh-34px)] gap-3 p-3 bg-gray-100">
@@ -48,7 +94,7 @@ export default function Rooms() {
         {/* Room label */}
         <div className="px-5 pb-2">
           <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">
-            Chats · Room 1234
+            Chats · Room {roomId}
           </span>
         </div>
 
