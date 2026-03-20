@@ -21,7 +21,7 @@ export default function GuestProfileSetup({ mode, roomId, onBack }: Readonly<Gue
     const [error, setError] = useState<string | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
     const router = useRouter();
-    const { postForm, post } = ApiFetch();
+    const { postForm } = ApiFetch();
 
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -30,59 +30,65 @@ export default function GuestProfileSetup({ mode, roomId, onBack }: Readonly<Gue
         setAvatarPreview(URL.createObjectURL(file));
     };
 
-const handleSubmit = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-        const formData = new FormData();
-        formData.append("isGuestUser", "true");
-        if (username)    formData.append("username", username);
-        if (email)       formData.append("email", email);
-        if (profileFile) formData.append("profile", profileFile);
-        if (mode === "join" && roomId) formData.append("roomId", roomId);
+    const handleSubmit = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const formData = new FormData();
+            formData.append("isGuestUser", "true");
+            if (username) formData.append("username", username);
+            if (email) formData.append("email", email);
+            if (profileFile) formData.append("profile", profileFile);
+            if (mode === "join" && roomId) formData.append("roomId", roomId);
 
-        const data = await postForm("http://localhost:3001/auth/signup", formData);
+            const data = await postForm("http://localhost:3001/auth/signup", formData);
 
-        if (!data?.token || !data?.userId) {
-            setError("Signup failed. Please try again.");
-            return;
-        }
-
-        Cookies.set("bearerToken", data.token);
-
-        if (mode === "join") {
-            // ✅ Raw fetch — uses fresh token directly, not the stale one in ApiFetch
-            const joinRes = await fetch("http://localhost:3001/rooms/joinUserToRoom", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${data.token}`,  // fresh token
-                },
-                body: JSON.stringify({
-                    roomId: String(roomId),
-                    userId: data.userId,
-                }),
-            });
-
-            if (!joinRes.ok) {
-                const err = await joinRes.text();
-                console.error("Join failed:", err);
-                setError("Couldn't join room. Please check the room ID.");
+            if (!data?.token || !data?.userId) {
+                setError("Signup failed. Please try again.");
                 return;
             }
 
-            router.push(`/Rooms?roomId=${roomId}`);
-        } else {
-            router.push(`/Rooms`);
-        }
+            Cookies.set("bearerToken", data.token);
 
-    } catch (e: any) {
-        setError("Something went wrong. Please try again.");
-        console.error(e);
-    } finally {
-        setLoading(false);
+            if (mode === "join") {
+                const joinRes = await fetch("http://localhost:3001/rooms/joinUserToRoom", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${data.token}`,
+                    },
+                    body: JSON.stringify({
+                        roomId: String(roomId),
+                        userId: data.userId,
+                    }),
+                });
+
+                if (!joinRes.ok) {
+                    const err = await joinRes.text();
+                    console.error("Join failed:", err);
+                    setError("Couldn't join room. Please check the room ID.");
+                    return;
+                }
+
+                router.push(`/Rooms?roomId=${roomId}`);
+            } else {
+                router.push(`/Rooms`);
+            }
+
+        } catch (e: any) {
+            setError("Something went wrong. Please try again.");
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+    let buttonText = "";
+
+    if (loading) {
+        buttonText = mode === "join" ? "Joining..." : "Creating...";
+    } else {
+        buttonText = mode === "join" ? "Join Room" : "Save & continue";
     }
-};
 
     return (
         <div className="p-7">
@@ -154,10 +160,7 @@ const handleSubmit = async () => {
                     className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-white text-sm font-semibold transition-all duration-200 hover:opacity-90 active:scale-[0.98] shadow-md disabled:opacity-60"
                     style={{ background: "linear-gradient(135deg, #1d4ed8, #2563eb)" }}
                 >
-                    {loading
-                        ? mode === "join" ? "Joining..." : "Creating..."
-                        : mode === "join" ? "Join Room" : "Save & continue"
-                    }
+                    {buttonText}
                     {!loading && <ArrowRight size={14} />}
                 </button>
             </div>

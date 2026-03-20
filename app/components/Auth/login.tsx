@@ -81,7 +81,7 @@ function JoinRoomDialog({ onClose }: Readonly<{ onClose: () => void }>) {
             });
 
             if (!res.ok) throw new Error("Failed to join");
-
+            localStorage.setItem("roomId", roomId);
             router.push(`/Rooms?roomId=${roomId}`);
 
         } catch (e: any) {
@@ -187,7 +187,7 @@ export default function Login() {
         try {
             const response = await post("http://localhost:3001/auth/login", loginPayload);
             Cookies.set("bearerToken", response.token);
-            router.push("/Rooms");
+            router.push("/rooms-details");
         } catch (e: any) {
             console.error(e);
         }

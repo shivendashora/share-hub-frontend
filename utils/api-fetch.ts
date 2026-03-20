@@ -16,7 +16,7 @@ export default function ApiFetch<T = unknown>() {
     const token = Cookies.get('bearerToken');
 
     const handleAuthError = () => {
-        Cookies.remove("bearerToken"); // clear expired token
+        Cookies.remove("bearerToken"); 
         router.push("/Auth");
     };
 

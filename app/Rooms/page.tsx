@@ -4,8 +4,7 @@ import UserCard from "../components/Rooms/user-card";
 import ChatInterface from "../components/Rooms/chat-interface";
 import { Search, Edit } from "lucide-react";
 import ApiFetch from "@/utils/api-fetch";
-import { useSearchParams } from "next/navigation";
-import { useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
 const usersData = [
   { id: 1, name: "Shiven", lastMessage: "Hey bro!", time: "10:45 AM", unread: 2 },
@@ -25,42 +24,39 @@ export default function Rooms() {
   const { get } = ApiFetch()
 
   const filtered = users.filter((u) =>
-    u.userName.toLowerCase().includes(search.toLowerCase())  // was u.name
+    u.userName.toLowerCase().includes(search.toLowerCase()) 
   );
 
-  console.log(filtered);
-
-  // Rooms.tsx
   const fetchRoomInfo = async () => {
-    try {
+    let finalRoomId = queryRoomId;
 
-      let finalRoomId = queryRoomId;
 
-      if (!finalRoomId) {
-        const room = await get("http://localhost:3001/rooms/createRoomForUser");
-        finalRoomId = room?.roomId;
-      }
+    if (finalRoomId) {
+      router.replace(`?roomId=${finalRoomId}`);
+    } else {
+      const room = await get("http://localhost:3001/rooms/createRoomForUser");
+      finalRoomId = room?.roomId;
 
       if (finalRoomId) {
-        setRoomId(finalRoomId);
-
-        const usersResponse = await get(
-          `http://localhost:3001/rooms/getMembers/${finalRoomId}`
-        );
-
-        const mapped = usersResponse?.mappedUsers ?? [];
-        setUsers(mapped);
-
-        if (mapped.length > 0) {
-          setSelectedUser(mapped[0]);
-        }
+        router.replace(`?roomId=${finalRoomId}`);
       }
-
-    } catch (e: any) {
-      console.error(e);
     }
-  }
 
+    if (finalRoomId) {
+      setRoomId(finalRoomId);
+
+      const usersResponse = await get(
+        `http://localhost:3001/rooms/getMembers/${finalRoomId}`
+      );
+
+      const mapped = usersResponse?.mappedUsers ?? [];
+      setUsers(mapped);
+
+      if (mapped.length > 0) {
+        setSelectedUser(mapped[0]);
+      }
+    }
+  };
   useEffect(() => {
     fetchRoomInfo()
   }, [])
