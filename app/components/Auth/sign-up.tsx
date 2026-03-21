@@ -39,10 +39,6 @@ export default function SignUp({ onBackToLogin }: any) {
 
     const handleSignUp = async (e: any) => {
         e.preventDefault();
-        console.log("UserName", username);
-        console.log("PassWord", password);
-        console.log("ConfirmPassword", confirmPassword);
-        console.log('email', email);
 
         const signUpPayload = {
             username: username,
@@ -51,16 +47,19 @@ export default function SignUp({ onBackToLogin }: any) {
             email: email
         }
 
-        console.log("signup payload",signUpPayload);
+        try{
+            const response = await post("http://localhost:3001/auth/signup", signUpPayload)
+            console.log(response);
+        }
+        catch(error:any){
+            console.error(error)
+        }
 
-        const response = await post("http://localhost:3001/auth/signup", signUpPayload)
-        console.log("Response from API..", response);
 
     }
 
     return (
         <div className="w-full max-w-sm flex flex-col gap-7 px-6">
-            {/* Heading */}
             <div>
                 <button
                     type="button"
@@ -72,8 +71,7 @@ export default function SignUp({ onBackToLogin }: any) {
                 <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Create account</h2>
                 <p className="mt-1.5 text-sm text-gray-500">Join Share Hub — it's free to get started</p>
             </div>
-
-            {/* Form */}
+            
             <form
                 className="flex flex-col gap-4"
                 onSubmit={(e) => {

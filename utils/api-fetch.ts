@@ -11,13 +11,15 @@ export default function ApiFetch<T = unknown>() {
     const [data, setData] = useState<T | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const [cheking,setChecking] = useState<boolean>(false);
 
     const router = useRouter();
     const token = Cookies.get('bearerToken');
 
     const handleAuthError = () => {
-        Cookies.remove("bearerToken"); 
+        setChecking(true);
         router.push("/Auth");
+        Cookies.remove("bearerToken"); 
     };
 
     const request = async (
@@ -97,6 +99,7 @@ export default function ApiFetch<T = unknown>() {
         data,
         loading,
         error,
+        cheking,
         get: (url: string) => request(url, "GET"),
         post: (url: string, body: unknown) => request(url, "POST", body),
         postForm: (url: string, body: FormData) => requestForm(url, body),

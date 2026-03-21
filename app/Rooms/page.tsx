@@ -2,9 +2,10 @@
 import { useEffect, useState } from "react";
 import UserCard from "../components/Rooms/user-card";
 import ChatInterface from "../components/Rooms/chat-interface";
-import { Search, Edit } from "lucide-react";
+import { Search, Edit, LogOut } from "lucide-react";
 import ApiFetch from "@/utils/api-fetch";
 import { useSearchParams, useRouter } from "next/navigation";
+import Cookies from "js-cookie";
 
 const usersData = [
   { id: 1, name: "Shiven", lastMessage: "Hey bro!", time: "10:45 AM", unread: 2 },
@@ -21,10 +22,10 @@ export default function Rooms() {
   const searchParams = useSearchParams();
   const queryRoomId = searchParams.get("roomId");
   const router = useRouter();
-  const { get } = ApiFetch()
+  const { get,cheking } = ApiFetch()
 
   const filtered = users.filter((u) =>
-    u.userName.toLowerCase().includes(search.toLowerCase()) 
+    u.userName.toLowerCase().includes(search.toLowerCase())
   );
 
   const fetchRoomInfo = async () => {
@@ -57,9 +58,25 @@ export default function Rooms() {
       }
     }
   };
+
+  const handleLogout = () => {
+    Cookies.remove("bearerToken");
+    router.push("/Auth");
+  };
+
   useEffect(() => {
     fetchRoomInfo()
   }, [])
+
+  if(cheking){
+    return(
+      <div className="h-[calc(100vh-34px)] flex items-center justify-center">
+        <span className="text-sm text-gray-300">
+          Can't load room user yet Not authenticated
+        </span>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-row h-[calc(100vh-34px)] gap-3 p-3 bg-gray-100">
@@ -88,10 +105,17 @@ export default function Rooms() {
         </div>
 
         {/* Room label */}
-        <div className="px-5 pb-2">
+        <div className="px-5 pb-2 flex flex-row justify-between items-center">
           <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">
             Chats · Room {roomId}
           </span>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 text-xs font-semibold text-red-500 hover:text-red-600 transition-colors"
+          >
+            <LogOut size={14} />
+            Logout
+          </button>
         </div>
 
         {/* User list */}
