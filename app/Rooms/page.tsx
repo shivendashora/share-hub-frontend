@@ -22,7 +22,7 @@ export default function Rooms() {
   const searchParams = useSearchParams();
   const queryRoomId = searchParams.get("roomId");
   const router = useRouter();
-  const { get,cheking } = ApiFetch()
+  const { get, cheking } = ApiFetch()
 
   const filtered = users.filter((u) =>
     u.userName.toLowerCase().includes(search.toLowerCase())
@@ -59,17 +59,27 @@ export default function Rooms() {
     }
   };
 
-  const handleLogout = () => {
-    Cookies.remove("bearerToken");
-    router.push("/Auth");
+  const handleLogout = async () => {
+
+    try {
+
+      const response = await get(`http://localhost:3001/auth/logoutuser/${roomId}`);
+      Cookies.remove("bearerToken");
+      router.push("/Auth");
+    }
+    catch (e: any) {
+      console.error(e);
+    }
+
+
   };
 
   useEffect(() => {
     fetchRoomInfo()
   }, [])
 
-  if(cheking){
-    return(
+  if (cheking) {
+    return (
       <div className="h-[calc(100vh-34px)] flex items-center justify-center">
         <span className="text-sm text-gray-300">
           Can't load room user yet Not authenticated
