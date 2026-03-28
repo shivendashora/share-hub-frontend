@@ -20,10 +20,10 @@ export default function BodyLayout({ children }: any) {
 
         const token = Cookies.get("bearerToken");
 
-        if (!token) {
-            router.replace("/Auth");
-        } else {
+        if (token) {
             setChecked(true);
+        } else {
+            router.replace("/Auth");
         }
     }, [pathname]);
 

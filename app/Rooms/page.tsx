@@ -6,6 +6,7 @@ import { Search, Edit, LogOut } from "lucide-react";
 import ApiFetch from "@/utils/api-fetch";
 import { useSearchParams, useRouter } from "next/navigation";
 import Cookies from "js-cookie";
+import { useApi } from "@/context/api-context";
 
 const usersData = [
   { id: 1, name: "Shiven", lastMessage: "Hey bro!", time: "10:45 AM", unread: 2 },
@@ -23,18 +24,23 @@ export default function Rooms() {
   const queryRoomId = searchParams.get("roomId");
   const router = useRouter();
   const { get, cheking } = ApiFetch()
-
+  const {setLoading} = useApi() 
+ 
   const filtered = users.filter((u) =>
     u.userName.toLowerCase().includes(search.toLowerCase())
   );
 
-  const fetchRoomInfo = async () => {
+const fetchRoomInfo = async () => {
+  setLoading(true);
+
+  try {
     let finalRoomId = queryRoomId;
 
-
+    // If roomId exists in query, use it
     if (finalRoomId) {
       router.replace(`?roomId=${finalRoomId}`);
     } else {
+      // Create room if not exists
       const room = await get("http://localhost:3001/rooms/createRoomForUser");
       finalRoomId = room?.roomId;
 
@@ -43,32 +49,48 @@ export default function Rooms() {
       }
     }
 
-    if (finalRoomId) {
-      setRoomId(finalRoomId);
-
-      const usersResponse = await get(
-        `http://localhost:3001/rooms/getMembers/${finalRoomId}`
-      );
-
-      const mapped = usersResponse?.mappedUsers ?? [];
-      setUsers(mapped);
-
-      if (mapped.length > 0) {
-        setSelectedUser(mapped[0]);
-      }
+    if (!finalRoomId) {
+      throw new Error("Room ID not found or failed to create room");
     }
-  };
+
+    setRoomId(finalRoomId);
+
+    // Fetch users in the room
+    const usersResponse = await get(
+      `http://localhost:3001/rooms/getMembers/${finalRoomId}`
+    );
+
+    const mapped = usersResponse?.mappedUsers ?? [];
+    setUsers(mapped);
+
+    if (mapped.length > 0) {
+      setSelectedUser(mapped[0]);
+    }
+
+  } catch (error: any) {
+    console.error("Error fetching room info:", error);
+    setLoading(false);
+    
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleLogout = async () => {
 
     try {
 
-      const response = await get(`http://localhost:3001/auth/logoutuser/${roomId}`);
+      setLoading(true);
+      await get(`http://localhost:3001/auth/logoutuser/${roomId}`);
       Cookies.remove("bearerToken");
       router.push("/Auth");
     }
     catch (e: any) {
       console.error(e);
+      setLoading(false);
+    }
+    finally{
+      setLoading(false);
     }
 
 

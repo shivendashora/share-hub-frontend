@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import BodyLayout from "./body-layout";
 import { ApiProvider } from "@/context/api-context";
+import { Loader } from "./loader";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -10,14 +11,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="en">
       <body>
         <ApiProvider>
           <BodyLayout>
+            <Loader/>
             {children}
           </BodyLayout>
         </ApiProvider>
