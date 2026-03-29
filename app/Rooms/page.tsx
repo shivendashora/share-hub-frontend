@@ -7,98 +7,94 @@ import ApiFetch from "@/utils/api-fetch";
 import { useSearchParams, useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import { useApi } from "@/context/api-context";
-
-const usersData = [
-  { id: 1, name: "Shiven", lastMessage: "Hey bro!", time: "10:45 AM", unread: 2 },
-  { id: 2, name: "Rahul", lastMessage: "Let's meet tomorrow", time: "09:30 AM" },
-  { id: 3, name: "Ananya", lastMessage: "Sent the files ✅", time: "Yesterday" },
-  { id: 4, name: "Priya", lastMessage: "Can you review this?", time: "Yesterday" },
-];
+import { jwtDecode } from "jwt-decode";
 
 export default function Rooms() {
-  const [selectedUser, setSelectedUser] = useState(usersData[0]);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
   const [search, setSearch] = useState("");
   const [roomId, setRoomId] = useState<string | null>(null);
-  const [users, setUsers] = useState<any[]>([])
+  const [users, setUsers] = useState<any[]>([]);
+
   const searchParams = useSearchParams();
   const queryRoomId = searchParams.get("roomId");
   const router = useRouter();
-  const { get, cheking } = ApiFetch()
-  const {setLoading} = useApi() 
- 
+  const { get, cheking } = ApiFetch();
+  const { setLoading } = useApi();
+
   const filtered = users.filter((u) =>
-    u.userName.toLowerCase().includes(search.toLowerCase())
+    (u.userName || u.name || "")
+      .toLowerCase()
+      .includes(search.toLowerCase())
   );
 
-const fetchRoomInfo = async () => {
-  setLoading(true);
-
-  try {
-    let finalRoomId = queryRoomId;
-
-    // If roomId exists in query, use it
-    if (finalRoomId) {
-      router.replace(`?roomId=${finalRoomId}`);
-    } else {
-      // Create room if not exists
-      const room = await get("http://localhost:3001/rooms/createRoomForUser");
-      finalRoomId = room?.roomId;
-
-      if (finalRoomId) {
-        router.replace(`?roomId=${finalRoomId}`);
-      }
-    }
-
-    if (!finalRoomId) {
-      throw new Error("Room ID not found or failed to create room");
-    }
-
-    setRoomId(finalRoomId);
-
-    // Fetch users in the room
-    const usersResponse = await get(
-      `http://localhost:3001/rooms/getMembers/${finalRoomId}`
-    );
-
-    const mapped = usersResponse?.mappedUsers ?? [];
-    setUsers(mapped);
-
-    if (mapped.length > 0) {
-      setSelectedUser(mapped[0]);
-    }
-
-  } catch (error: any) {
-    console.error("Error fetching room info:", error);
-    setLoading(false);
-    
-  } finally {
-    setLoading(false);
-  }
-};
-
-  const handleLogout = async () => {
+  const fetchRoomInfo = async () => {
+    setLoading(true);
 
     try {
+      let finalRoomId = queryRoomId;
 
+      // If roomId exists in query
+      if (finalRoomId) {
+        router.replace(`?roomId=${finalRoomId}`);
+      } else {
+        // Create room
+        const room = await get("http://localhost:3001/rooms/createRoomForUser");
+        finalRoomId = room?.roomId;
+
+        if (finalRoomId) {
+          router.replace(`?roomId=${finalRoomId}`);
+        }
+      }
+
+      if (!finalRoomId) {
+        throw new Error("Room ID not found or failed to create room");
+      }
+
+      setRoomId(finalRoomId);
+
+      // Fetch users
+      const usersResponse = await get(
+        `http://localhost:3001/rooms/getMembers/${finalRoomId}`
+      );
+
+      const mapped = usersResponse?.mappedUsers ?? [];
+      setUsers(mapped);
+
+
+
+      if (mapped.length > 0) {
+        const bearerToken = Cookies.get("bearerToken");
+        if (!bearerToken) return;
+
+        const decoded: any = jwtDecode(bearerToken);
+        const currentUser = mapped.find(
+          (user: any) => user.id === decoded.userId
+        );
+        setSelectedUser(currentUser || mapped[0]);
+      }
+    } catch (error: any) {
+      console.error("Error fetching room info:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
       setLoading(true);
       await get(`http://localhost:3001/auth/logoutuser/${roomId}`);
       Cookies.remove("bearerToken");
       router.push("/Auth");
-    }
-    catch (e: any) {
+    } catch (e: any) {
       console.error(e);
+    } finally {
       setLoading(false);
     }
-    finally{
-      setLoading(false);
-    }
-
-
   };
 
   useEffect(() => {
-    fetchRoomInfo()
-  }, [])
+    fetchRoomInfo();
+  }, []);
 
   if (cheking) {
     return (
@@ -107,16 +103,18 @@ const fetchRoomInfo = async () => {
           Can't load room user yet Not authenticated
         </span>
       </div>
-    )
+    );
   }
 
   return (
     <div className="flex flex-row h-[calc(100vh-34px)] gap-3 p-3 bg-gray-100">
       {/* Sidebar */}
       <div className="w-[30%] bg-white border border-gray-100 shadow-sm overflow-hidden rounded-2xl flex flex-col">
-        {/* Sidebar header */}
+        {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
-          <h2 className="text-base font-bold text-gray-900 tracking-tight">Messages</h2>
+          <h2 className="text-base font-bold text-gray-900 tracking-tight">
+            Messages
+          </h2>
           <button className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 transition-colors">
             <Edit size={15} />
           </button>
@@ -156,7 +154,7 @@ const fetchRoomInfo = async () => {
             <UserCard
               key={user.id}
               user={user}
-              isActive={selectedUser.id === user.id}
+              isActive={selectedUser?.id === user.id}
               onClick={() => setSelectedUser(user)}
             />
           ))}
@@ -165,7 +163,12 @@ const fetchRoomInfo = async () => {
 
       {/* Chat panel */}
       <div className="w-[70%]">
-        <ChatInterface selectedUser={selectedUser} />
+        {selectedUser && roomId && (
+          <ChatInterface
+            selectedUser={selectedUser}
+            roomId={roomId}
+          />
+        )}
       </div>
     </div>
   );

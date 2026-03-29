@@ -1,13 +1,21 @@
 'use client'
 import { useState, useRef, useEffect } from "react";
 import { Send, Paperclip, Phone, Video, MoreHorizontal } from "lucide-react";
+import { socket } from "@/utils/socket";
 
-export default function ChatInterface({ selectedUser }: any) {
-  const [messages, setMessages] = useState([
-    { id: 1, text: "Hello 👋", sender: "them" },
-    { id: 2, text: "Hi! How are you?", sender: "me" },
-    { id: 3, text: "I'm doing great, thanks for asking!", sender: "them" },
-  ]);
+type Message = {
+  id: number;
+  text: string;
+  sender: "me" | "them";
+  user: {
+    id: number;
+    name: string;
+    avatar?: string;
+  };
+};
+
+export default function ChatInterface({ selectedUser, roomId }: any) {
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -15,9 +23,57 @@ export default function ChatInterface({ selectedUser }: any) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    if (!roomId) return;
+
+    socket.emit("joinRoom", roomId);
+  }, [roomId]);
+
+  useEffect(() => {
+    socket.on("sendMessage", (msg) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          text: msg.message,
+          sender: "them",
+          user: msg.user
+        }
+      ]);
+    });
+
+    return () => {
+      socket.off("sendMessage");
+    };
+  }, []);
+
   const handleSend = () => {
     if (!newMessage.trim()) return;
-    setMessages([...messages, { id: Date.now(), text: newMessage, sender: "me" }]);
+
+    const messageData = {
+      message: newMessage,
+      user: {
+        id: selectedUser.id,
+        name: selectedUser.userName,
+        avatar: selectedUser.image 
+      }
+    };
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        text: messageData.message,
+        sender: "me",
+        user: messageData.user
+      }
+    ]);
+
+    socket.emit("sendMessage", {
+      roomId,
+      ...messageData
+    });
+
     setNewMessage("");
   };
 
@@ -27,15 +83,21 @@ export default function ChatInterface({ selectedUser }: any) {
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <img
-              src={selectedUser.image || `https://i.pravatar.cc/100?u=${selectedUser.id}`}
-              alt={selectedUser.name}
-              className="w-9 h-9 rounded-full object-cover"
-            />
+            {selectedUser.image ? (
+              <img
+                src={selectedUser.image}
+                alt={selectedUser.userName[0].toUpperCase()}
+                className="w-10 h-10 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold">
+                {selectedUser.userName[0].toUpperCase()}
+              </div>
+            )}
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-white" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-gray-900">{selectedUser.name}</p>
+            <p className="text-sm font-semibold text-gray-900">{selectedUser.userName}</p>
             <p className="text-xs text-emerald-500 font-medium">Active now</p>
           </div>
         </div>
@@ -56,17 +118,50 @@ export default function ChatInterface({ selectedUser }: any) {
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`flex ${msg.sender === "me" ? "justify-end" : "justify-start"}`}
+            className={`flex items-end gap-2 ${msg.sender === "me" ? "justify-end" : "justify-start"}`}
           >
+            {/* Avatar for "them" - shown on the left */}
+            {msg.sender === "them" && (
+              <div className="flex-shrink-0">
+                {msg.user.avatar ? (
+                  <img
+                    src={msg.user.avatar}
+                    alt={msg.user.name}
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center text-white text-xs font-semibold">
+                    {msg.user.name?.[0]?.toUpperCase()}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div
-              className={`max-w-[60%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                msg.sender === "me"
+              className={`max-w-[60%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${msg.sender === "me"
                   ? "bg-indigo-500 text-white rounded-br-sm shadow-sm shadow-indigo-100"
                   : "bg-white text-gray-800 border border-gray-100 rounded-bl-sm shadow-sm"
-              }`}
+                }`}
             >
               {msg.text}
             </div>
+
+            {/* Avatar for "me" - shown on the right */}
+            {msg.sender === "me" && (
+              <div className="flex-shrink-0">
+                {selectedUser.image ? (
+                  <img
+                    src={selectedUser.image}
+                    alt={selectedUser.userName}
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-semibold">
+                    {selectedUser.userName?.[0]?.toUpperCase()}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ))}
         <div ref={bottomRef} />
