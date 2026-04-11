@@ -10,15 +10,19 @@ export default function BodyLayout({ children }: any) {
     const pathname = usePathname();
     const [checked, setChecked] = useState(false);
 
-    const isAuthPage = pathname === "/Auth";
-
     useEffect(() => {
-        if (isAuthPage) {
-            setChecked(true);
+        const token = Cookies.get("bearerToken");
+        const isAuth = pathname === "/Auth" || pathname === "/";
+
+        if (token && isAuth) {
+            router.push('/rooms-details');
             return;
         }
 
-        const token = Cookies.get("bearerToken");
+        if (isAuth) {
+            setChecked(true);
+            return;
+        }
 
         if (token) {
             setChecked(true);
@@ -39,7 +43,7 @@ export default function BodyLayout({ children }: any) {
 
     return (
         <div className="px-4 py-4 bg-slate-100 min-h-screen">
-                {children}
+            {children}
         </div>
     );
 }
