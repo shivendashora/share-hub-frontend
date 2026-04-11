@@ -79,6 +79,18 @@ export default function Rooms() {
     }
   };
 
+  /*
+    Implement polling for reguraly fetching records for users
+    added cleanup 
+  */
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchRoomInfo();
+    }, 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const handleLogout = async () => {
     try {
       setLoading(true);

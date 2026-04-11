@@ -138,12 +138,21 @@ export default function ChatInterface({ selectedUser, roomId }: any) {
             )}
 
             <div
-              className={`max-w-[60%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${msg.sender === "me"
+              className={`min-w-[150px] px-4 py-2.5 rounded-2xl text-sm leading-relaxed px-4 py-2.5 rounded-2xl text-sm flex flex-col gap-2  ${msg.sender === "me"
                   ? "bg-indigo-500 text-white rounded-br-sm shadow-sm shadow-indigo-100"
                   : "bg-white text-gray-800 border border-gray-100 rounded-bl-sm shadow-sm"
                 }`}
             >
-              {msg.text}
+
+              <div className={`w-[100%] border-b-1 ${msg.sender === "me" ? "text-white border-white":"text-black border-black"}`}>
+                <span className="text-[10px]"> 
+                  {msg.user.name}
+                </span>
+              </div>
+              <div>
+                {msg.text}
+              </div>
+              
             </div>
 
             {/* Avatar for "me" - shown on the right */}
