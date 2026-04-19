@@ -1,9 +1,12 @@
 'use client'
 
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import ApiFetch from "@/utils/api-fetch";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useApi } from "@/context/api-context";
+import { LogOut, Settings } from "lucide-react";
+import Cookies from "js-cookie";
 
 interface Room {
     id: number;
@@ -17,9 +20,10 @@ interface Room {
 
 export default function RoomTable() {
     const [rooms, setRooms] = useState<Room[]>([]);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-    const { get } = ApiFetch();
-    const { setLoading } = useApi()
+    const { post,get } = ApiFetch();
+    const { setLoading } = useApi();
     const router = useRouter();
 
     const fetchRooms = async () => {
@@ -28,32 +32,29 @@ export default function RoomTable() {
             const response = await get("http://localhost:3001/rooms/getAllRoomsCreatedByUser");
             const data = response ?? [];
             setRooms(Array.isArray(data) ? data : []);
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error(e);
-        }
-        finally {
+        } finally {
             setLoading(false);
         }
     };
 
+    const handleFetchRooms = useEffectEvent(() => {
+        void fetchRooms();
+    });
+
     const handleCreateRoom = async () => {
         try {
-
             setLoading(true);
-            const newRoom = await get(
-                "http://localhost:3001/rooms/createRoomForUser",
-            );
-
+            const newRoom = await get("http://localhost:3001/rooms/createRoomForUser");
             if (newRoom) {
                 setRooms((prev) => [newRoom, ...prev]);
             } else {
                 await fetchRooms();
             }
-
         } catch (e) {
             console.error(e);
-        }
-        finally {
+        } finally {
             setLoading(false);
         }
     };
@@ -62,8 +63,21 @@ export default function RoomTable() {
         router.push(`/Rooms?roomId=${roomId}`);
     };
 
+    const handleLogout = async () => {
+        setIsLoggingOut(true);
+        try {
+            await post(`http://localhost:3001/auth/logoutuser/`,{});
+        } catch (e) {
+            console.error(e);
+        } finally {
+            Cookies.remove("bearerToken");
+            router.replace("/Auth");
+            setIsLoggingOut(false);
+        }
+    };
+
     useEffect(() => {
-        fetchRooms();
+        handleFetchRooms();
     }, []);
 
     return (
@@ -80,12 +94,36 @@ export default function RoomTable() {
                         {rooms.length} room{rooms.length === 1 ? "" : "s"} created by you
                     </p>
                 </div>
-                <button
-                    onClick={handleCreateRoom}
-                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white transition-colors duration-150"
-                >
-                    + Create Room
-                </button>
+
+                <div className="flex items-center gap-3">
+                    {/* Settings */}
+                    <Link
+                        href="/user-profile"
+                        aria-label="Open profile settings"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:text-gray-900 transition-colors duration-150"
+                    >
+                        <Settings size={16} />
+                    </Link>
+
+                    {/* Logout — same size/shape as settings, turns red on hover */}
+                    <button
+                        type="button"
+                        onClick={handleLogout}
+                        disabled={isLoggingOut}
+                        aria-label="Logout"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 hover:border-red-300 hover:bg-red-50 hover:text-red-500 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <LogOut size={16} />
+                    </button>
+
+                    {/* Create Room */}
+                    <button
+                        onClick={handleCreateRoom}
+                        className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white transition-colors duration-150"
+                    >
+                        + Create Room
+                    </button>
+                </div>
             </div>
 
             <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden shadow-sm">
@@ -134,7 +172,6 @@ export default function RoomTable() {
                                     )}
                                 </td>
 
-                                {/* Role */}
                                 <td className="px-5 py-4">
                                     {room.isAdmin ? (
                                         <span className="px-2.5 py-1 rounded-full text-xs bg-indigo-50 text-indigo-600 border border-indigo-200">
@@ -150,7 +187,7 @@ export default function RoomTable() {
                                 <td className="px-5 py-4 text-right">
                                     <button
                                         onClick={() => handleJoin(room.roomId)}
-                                        className="px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white"
+                                        className="px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors duration-150"
                                     >
                                         Join Room
                                     </button>

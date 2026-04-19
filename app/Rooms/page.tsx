@@ -18,7 +18,7 @@ export default function Rooms() {
   const searchParams = useSearchParams();
   const queryRoomId = searchParams.get("roomId");
   const router = useRouter();
-  const { get, cheking } = ApiFetch();
+  const { get, cheking,post } = ApiFetch();
   const { setLoading } = useApi();
 
   const filtered = users.filter((u) =>
@@ -87,14 +87,15 @@ export default function Rooms() {
     const interval = setInterval(() => {
       fetchRoomInfo();
     }, 60 * 1000);
-
     return () => clearInterval(interval);
   }, []);
 
   const handleLogout = async () => {
     try {
       setLoading(true);
-      await get(`http://localhost:3001/auth/logoutuser/${roomId}`);
+      await post("http://localhost:3001/auth/logoutuser/",{
+        roomId:roomId
+      });
       Cookies.remove("bearerToken");
       router.push("/Auth");
     } catch (e: any) {

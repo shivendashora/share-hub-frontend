@@ -47,7 +47,9 @@ export default function ApiFetch<T = unknown>() {
                 return;
             }
 
-            if (!res.ok) throw new Error("Request failed");
+            if (!res.ok){
+                console.error(res);
+            }
 
             const result = await res.json();
             setData(result);
