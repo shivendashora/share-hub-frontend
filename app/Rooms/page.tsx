@@ -168,7 +168,6 @@ export default function Rooms() {
               key={user.id}
               user={user}
               isActive={selectedUser?.id === user.id}
-              onClick={() => setSelectedUser(user)}
             />
           ))}
         </div>
