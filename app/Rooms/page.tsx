@@ -14,11 +14,11 @@ export default function Rooms() {
   const [search, setSearch] = useState("");
   const [roomId, setRoomId] = useState<string | null>(null);
   const [users, setUsers] = useState<any[]>([]);
-
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const searchParams = useSearchParams();
   const queryRoomId = searchParams.get("roomId");
   const router = useRouter();
-  const { get, cheking,post } = ApiFetch();
+  const { get, cheking, post } = ApiFetch();
   const { setLoading } = useApi();
 
   const filtered = users.filter((u) =>
@@ -70,6 +70,7 @@ export default function Rooms() {
         const currentUser = mapped.find(
           (user: any) => user.id === decoded.userId
         );
+        setCurrentUserId(decoded.userId);
         setSelectedUser(currentUser || mapped[0]);
       }
     } catch (error: any) {
@@ -93,8 +94,8 @@ export default function Rooms() {
   const handleLogout = async () => {
     try {
       setLoading(true);
-      await post("http://localhost:3001/auth/logoutuser/",{
-        roomId:roomId
+      await post("http://localhost:3001/auth/logoutuser/", {
+        roomId: roomId
       });
       Cookies.remove("bearerToken");
       router.push("/Auth");
@@ -179,6 +180,7 @@ export default function Rooms() {
           <ChatInterface
             selectedUser={selectedUser}
             roomId={roomId}
+            currentUserId={currentUserId!}   // ← add this
           />
         )}
       </div>

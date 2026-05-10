@@ -1,15 +1,7 @@
 'use client'
 
 import { useEffect, useEffectEvent, useRef, useState, type ChangeEvent } from "react";
-import {
-  Send,
-  Paperclip,
-  Phone,
-  Video,
-  MoreHorizontal,
-  UserCog,
-  ArrowLeft
-} from "lucide-react";
+import { Send, Paperclip, Phone, Video, MoreHorizontal, UserCog, ArrowLeft } from "lucide-react";
 import { socket } from "@/utils/socket";
 import ApiFetch from "@/utils/api-fetch";
 import { useRouter } from "next/navigation";
@@ -28,6 +20,8 @@ interface ChatUser {
 interface ChatInterfaceProps {
   selectedUser: ChatUser;
   roomId: string;
+  // ✅ Add your own user ID so we can determine "me" vs "them"
+  currentUserId: number;
 }
 
 interface Message {
@@ -58,10 +52,18 @@ interface ChatRecord {
   thumbnailBase64?: string;
 }
 
+interface IncomingSocketMessage {
+  message: string;
+  user: Message["user"];
+  documentId?: number;
+  fileName?: string;
+  fileUrl?: string;
+  thumbnailBase64?: string;
+  type?: "text" | "file";
+}
+
 interface GetRoomChatsResponse {
-  response?: {
-    data?: ChatRecord[];
-  };
+  response?: { data?: ChatRecord[] };
 }
 
 interface UploadRoomFileResponse {
@@ -74,26 +76,10 @@ interface UploadRoomFileResponse {
   message?: string;
 }
 
-interface GetDocumentResponse {
-  response?: {
-    documentId: number;
-    fileName: string;
-    fileUrl: string;
-    thumbnailBase64: string | null;
-  };
-}
-
-interface IncomingSocketMessage {
-  message: string;
-  user: Message["user"];
-  documentId?: number;
-  fileName?: string;
-  filePath?: string;
-}
-
 export default function ChatInterface({
   selectedUser,
   roomId,
+  currentUserId,  
 }: Readonly<ChatInterfaceProps>) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -129,19 +115,6 @@ export default function ChatInterface({
     return () => document.removeEventListener("mousedown", handleDocumentClick);
   }, [isUploadPopoverOpen]);
 
-  // ─── Resolve documentId → full file + thumbnail ────────────────────────────
-  const fetchDocumentById = async (documentId: number) => {
-    try {
-      const res = await post(
-        `http://localhost:3001/rooms/getDocument/${documentId}`,
-        {}
-      ) as GetDocumentResponse | undefined;
-      return res?.response ?? null;
-    } catch {
-      return null;
-    }
-  };
-
   // ─── Initial history load ──────────────────────────────────────────────────
   const fetchInitialChatMessages = async (activeRoomId: string) => {
     try {
@@ -153,12 +126,11 @@ export default function ChatInterface({
         ? chats.response.data
         : [];
 
-      // Backend already resolves fileName / fileUrl / thumbnailBase64 for
-      // file messages in getRoomChats, so map them directly.
       const formattedMessages: Message[] = roomChats.map((chat) => ({
         id: chat.id,
         text: chat.text || chat.chats || "",
-        sender: chat.userId === selectedUser.id ? "me" : "them",
+        // ✅ Compare against YOUR id, not the other person's id
+        sender: chat.userId === currentUserId ? "me" : "them",
         fileName: chat.fileName,
         fileUrl: chat.fileUrl,
         documentId: chat.documentId,
@@ -186,54 +158,50 @@ export default function ChatInterface({
     loadInitialChatMessages(roomId);
     socket.emit("joinRoom", roomId);
 
-    const handleMessage = async (message: IncomingSocketMessage) => {
-      const isFile = Boolean(message.documentId);
+    const handleMessage = (message: IncomingSocketMessage) => {
+      // ✅ Correctly determine sender using your own ID
+      const sender: MessageSender = message.user.id === currentUserId ? "me" : "them";
+      const isFile = Boolean(message.documentId) || Boolean(message.fileUrl);
 
-      if (isFile && message.documentId) {
-        // Receiver fetches the full document record so it gets
-        // the proper fileUrl + thumbnail even on first render
-        const doc = await fetchDocumentById(message.documentId);
-
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now(),
-            text: message.message || doc?.fileName || "",
-            sender: "them",
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          text: message.message ?? "",
+          sender,
+          // ✅ Always pass all file fields — works for both sender and receiver
+          ...(isFile && {
             documentId: message.documentId,
-            fileName: doc?.fileName ?? message.fileName,
-            fileUrl: doc?.fileUrl,
-            thumbnailBase64: doc?.thumbnailBase64 ?? undefined,
-            user: message.user,
-          },
-        ]);
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          { id: Date.now(), text: message.message, sender: "them", user: message.user },
-        ]);
-      }
+            fileName: message.fileName,
+            fileUrl: message.fileUrl,
+            thumbnailBase64: message.thumbnailBase64,
+          }),
+          user: message.user,
+        },
+      ]);
     };
 
     socket.on("sendMessage", handleMessage);
-    return () => { socket.off("sendMessage", handleMessage); };
-  }, [roomId, selectedUser.id]);
+    return () => {
+      socket.off("sendMessage", handleMessage);
+    };
+  }, [roomId, currentUserId]);
 
   // ─── Send text ─────────────────────────────────────────────────────────────
   const handleSend = () => {
     if (!newMessage.trim()) return;
 
-    const messageData = {
+    // ✅ NO optimistic update — socket returns to sender too via server.to()
+    socket.emit("sendMessage", {
+      roomId,
       message: newMessage,
-      user: { id: selectedUser.id, name: selectedUser.userName, avatar: selectedUser.image },
-    };
+      user: {
+        id: currentUserId,
+        name: selectedUser.userName,
+        avatar: selectedUser.image,
+      },
+    });
 
-    setMessages((prev) => [
-      ...prev,
-      { id: Date.now(), text: messageData.message, sender: "me", user: messageData.user },
-    ]);
-
-    socket.emit("sendMessage", { roomId, ...messageData });
     setNewMessage("");
   };
 
@@ -244,7 +212,7 @@ export default function ChatInterface({
     setUploadMessage(null);
   };
 
-  // ─── Upload file → emit documentId via socket ──────────────────────────────
+  // ─── Upload file → emit via socket ────────────────────────────────────────
   const handleUploadFile = async () => {
     if (!selectedFile) { setUploadMessage("Choose a file first."); return; }
 
@@ -269,29 +237,19 @@ export default function ChatInterface({
 
       const fileUrl = `http://localhost:3001${filePath}`;
 
-      // Sender sees the message immediately with thumbnail from upload response
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          text: fileName,
-          sender: "me",
-          documentId,
-          fileName,
-          fileUrl,
-          thumbnailBase64: thumbnail?.base64 ?? undefined,
-          user: { id: selectedUser.id, name: selectedUser.userName, avatar: selectedUser.image },
-        },
-      ]);
-
-      // Broadcast just the documentId — receivers resolve it themselves
+      // ✅ NO optimistic update — socket event handles rendering for everyone
       socket.emit("sendMessage", {
         roomId,
         message: fileName,
         documentId,
         fileName,
-        filePath,
-        user: { id: selectedUser.id, name: selectedUser.userName, avatar: selectedUser.image },
+        fileUrl,
+        thumbnailBase64: thumbnail?.base64 ?? undefined,
+        user: {
+          id: currentUserId,
+          name: selectedUser.userName,
+          avatar: selectedUser.image,
+        },
       });
 
       setUploadMessage(response?.message || "File uploaded successfully.");
@@ -328,7 +286,6 @@ export default function ChatInterface({
             className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors">
             <ArrowLeft size={16} />
           </button>
-
           <div className="relative">
             {selectedUser.image ? (
               <img src={selectedUser.image} alt={selectedUser.userName}
@@ -340,13 +297,11 @@ export default function ChatInterface({
             )}
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-white" />
           </div>
-
           <div>
             <p className="text-sm font-semibold text-gray-900">{selectedUser.userName}</p>
             <p className="text-xs text-emerald-500 font-medium">Active now</p>
           </div>
         </div>
-
         <div className="flex items-center gap-1">
           {[Phone, Video, MoreHorizontal].map((Icon, index) => (
             <button key={index}
@@ -399,15 +354,12 @@ export default function ChatInterface({
             className="text-gray-400 hover:text-gray-600">
             <Paperclip size={17} />
           </button>
-
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelection} />
-
           <input type="text" placeholder="Write a message..."
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             className="flex-1 bg-transparent outline-none text-sm" />
-
           <button onClick={handleSend} disabled={!newMessage.trim()}
             className="w-7 h-7 bg-indigo-500 hover:bg-indigo-600 rounded-full flex items-center justify-center text-white disabled:opacity-40">
             <Send size={13} />
@@ -418,21 +370,17 @@ export default function ChatInterface({
           <div ref={uploadPopoverRef}
             className="absolute bottom-16 left-4 bg-white border border-gray-200 rounded-xl shadow-lg p-3 w-72 z-50">
             <p className="text-xs font-semibold text-gray-500 mb-2">Upload File</p>
-
             <button type="button" onClick={() => fileInputRef.current?.click()}
               className="w-full px-3 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 transition">
               Choose File
             </button>
-
             {selectedFile && (
               <div className="mt-2 text-xs text-gray-600 break-all">{selectedFile.name}</div>
             )}
-
             <button type="button" onClick={handleUploadFile} disabled={isUploading}
               className="mt-3 w-full px-3 py-2 text-sm rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50">
               {isUploading ? "Uploading..." : "Upload File"}
             </button>
-
             {uploadMessage && (
               <p className="mt-2 text-xs text-gray-500">{uploadMessage}</p>
             )}
